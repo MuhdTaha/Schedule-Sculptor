@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@400;500;700&display=swap');
+
+body {
+  background-color: #FAF8F5;
+  font-family: 'Inter', sans-serif;
+}
+
+.font-sans {
+  font-family: 'Inter', sans-serif;
+}
+
+.serif-title {
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.main-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.drop-zone {
+  border: 2px dashed #4C3B6F;
+  color: #4C3B6F;
+  transition: background-color 0.3s, border-style 0.3s;
+}
+
+.drop-zone:hover {
+  background-color: #F3F0F9;
+}
+
+.brand-purple {
+  color: #4C3B6F;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}

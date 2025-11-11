@@ -1,7 +1,30 @@
 {
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "pdfjs-dist": "^5.4.394",
     "react-router-dom": "^7.9.4"
-  }
+  },
+  "name": "schedule-sculptor",
+  "version": "1.0.0",
+  "description": "Schedule Sculptor is a web app that helps UIC students upload their degree audits, see remaining courses and prerequisites, and explore personalized class recommendations. It aims to simplify academic planning by turning confusing audits into clear, interactive roadmaps connected to the course catalog.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BaderRezek/Schedule-Sculptor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/BaderRezek/Schedule-Sculptor/issues"
+  },
+  "homepage": "https://github.com/BaderRezek/Schedule-Sculptor#readme"
 }

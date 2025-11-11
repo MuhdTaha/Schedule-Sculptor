@@ -27,7 +27,7 @@ function AIAssistant() {
     setHasSearched(true);
 
     try {
-      const response = await fetch('http://localhost:5001/query', {
+      const response = await fetch('http://localhost:5000/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,7 +45,7 @@ function AIAssistant() {
       const data = await response.json();
       setResults(data.results || []);
     } catch (err) {
-      setError('Unable to connect to the AI Assistant. Make sure the backend is running on port 5001.');
+      setError('Unable to connect to the AI Assistant. Make sure the backend is running on port 5000.');
       console.error('Search error:', err);
     } finally {
       setLoading(false);

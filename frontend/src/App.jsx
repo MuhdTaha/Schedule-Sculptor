@@ -15,15 +15,13 @@ import SculptSemester from './Sculpt/SculptSemester';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Welcome />} />
-        <Route path="/audit" element={<Audit />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/ai-assistant" element={<AIAssistant />} />
-        <Route path="/sculpt" element={<SculptSemester />} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<Welcome />} />
+      <Route path="/audit" element={<Audit />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/ai-assistant" element={<AIAssistant />} />
+      <Route path="/sculpt" element={<SculptSemester />} />
+    </Routes>
   );
 }
 

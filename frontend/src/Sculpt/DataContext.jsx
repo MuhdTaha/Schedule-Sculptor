@@ -51,7 +51,7 @@ export function DataProvider({ children }) {
         }
 
         // 2. Load Master Course Catalog from public/chunks.csv
-        const response = await fetch('/chunks.csv');
+        const response = await fetch(`${import.meta.env.BASE_URL}chunks.csv`);
         if (!response.ok) {
           throw new Error('Failed to fetch course catalog (chunks.csv)');
         }

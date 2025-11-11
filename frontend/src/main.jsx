@@ -4,11 +4,14 @@ import './index.css'
 import App from './App.jsx'
 import './styles/global.css'
 import { DataProvider } from './Sculpt/DataContext.jsx'
+import { BrowserRouter } from 'react-router-dom'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <DataProvider>
-      <App />
-    </DataProvider>
+    <BrowserRouter basename="/Schedule-Sculptor/">
+      <DataProvider>
+        <App />
+      </DataProvider>
+    </BrowserRouter>
   </StrictMode>,
 )

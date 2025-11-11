@@ -154,15 +154,15 @@ async function callGeminiApi(auditText) {
             throw new Error("GEMINI_API_KEY environment variable is not set.");
         }
 
-        // Initialize Google GenAI client with ML Dev (API key auth)
+        // Initialize Google GenAI client
         const ai = new GoogleGenAI({ 
-            vertexai: false,  // Use ML Dev, not Vertex AI
+            vertexai: false,
             apiKey: GEMINI_API_KEY 
         });
 
         // Make the call to the Gemini API
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: { 
                 responseMimeType: "application/json",

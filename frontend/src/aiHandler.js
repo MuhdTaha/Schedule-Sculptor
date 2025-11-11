@@ -3,12 +3,14 @@ import { dummyDegreeAudit } from "./dummyData.js";
 import dotenv from "dotenv";
 dotenv.config();
 
+const geminiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
 // initialize
 let model = null;
 let genAI = null;
-if (process.env.GOOGLE_API_KEY) {
+if (geminiKey) {
   try {
-    genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    genAI = new GoogleGenerativeAI(geminiKey);
   } catch (e) {
     console.warn("Could not initialize GoogleGenerativeAI client:", e.message || e);
     genAI = null;

@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 frontend/src/lib/test_audit.pdf
 
 **/venv/
+rag/web/__pycache__/app.cpython-310.pyc

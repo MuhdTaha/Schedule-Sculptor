@@ -14,6 +14,9 @@ function AIAssistant() {
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
 
+  // API URL - using Render deployment
+  const API_URL = 'http://localhost:5000/query';
+
   const handleSearch = async (e) => {
     e.preventDefault();
     
@@ -27,27 +30,80 @@ function AIAssistant() {
     setHasSearched(true);
 
     try {
-      const response = await fetch('http://localhost:5000/query', {
+      console.log('🔄 [Frontend] Sending request to API:', {
+        url: API_URL,
+        query: query,
+        timestamp: new Date().toISOString()
+      });
+
+      const requestBody = {
+        query: query,
+        top_courses: 8
+      };
+
+      console.log('📤 [Frontend] Request body:', JSON.stringify(requestBody, null, 2));
+
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query: query,
-          top_courses: 8
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch results');
+      console.log('📥 [Frontend] Response status:', response.status, response.statusText);
+      console.log('📥 [Frontend] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const responseText = await response.text();
+      console.log('📥 [Frontend] Raw response text:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('📥 [Frontend] Parsed response data:', data);
+      } catch (parseError) {
+        console.error('❌ [Frontend] JSON parse error:', parseError);
+        throw new Error('Invalid JSON response from server');
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.error('❌ [Frontend] API error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: data.error
+        });
+        
+        if (response.status === 500) {
+          throw new Error('Server error - please try again later');
+        } else if (response.status === 400) {
+          throw new Error('Invalid request - please check your query');
+        } else {
+          throw new Error(`Request failed with status: ${response.status}`);
+        }
+      }
+
+      // Handle API-specific errors
+      if (data.error) {
+        console.error('❌ [Frontend] API returned error:', data.error);
+        throw new Error(data.error);
+      }
+      
+      console.log('✅ [Frontend] Successfully received results:', {
+        resultCount: data.results?.length || 0,
+        results: data.results
+      });
+      
       setResults(data.results || []);
+      
     } catch (err) {
-      setError('Unable to connect to the AI Assistant. Make sure the backend is running on port 5000.');
-      console.error('Search error:', err);
+      console.error('❌ [Frontend] Search failed:', {
+        error: err,
+        message: err.message,
+        stack: err.stack
+      });
+      setError(`Unable to connect to the AI Assistant: ${err.message}`);
     } finally {
+      console.log('🏁 [Frontend] Search completed, loading set to false');
       setLoading(false);
     }
   };
@@ -130,6 +186,9 @@ function AIAssistant() {
         {error && (
           <div className="max-w-3xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
+            <p className="text-sm text-red-600 mt-2">
+              If this continues, please check your internet connection and try again.
+            </p>
           </div>
         )}
 

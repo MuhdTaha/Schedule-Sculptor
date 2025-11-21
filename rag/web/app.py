@@ -9,6 +9,8 @@ from flask_cors import CORS
 from pathlib import Path
 import json
 import re
+import time
+import threading
 
 import faiss
 import numpy as np
@@ -24,6 +26,8 @@ index = None
 chunks_df = None
 model = None
 config = None
+index_loaded = False
+loading_in_progress = False
 
 # Query expansion dictionary (same as query.py)
 TOPIC_SYNONYMS = {
@@ -79,32 +83,71 @@ def expand_query(q: str) -> str:
     return q
 
 def load_index():
-    """Load FAISS index, chunks CSV, and embedding model on startup."""
-    global index, chunks_df, model, config
+    """Load FAISS index, chunks CSV, and embedding model."""
+    global index, chunks_df, model, config, index_loaded, loading_in_progress
     
-    # Determine index directory path (relative to this file)
-    base_path = Path(__file__).resolve().parent
-    index_dir = base_path / "data" / "processed" / "index"
+    if loading_in_progress:
+        return
     
-    idx_path = index_dir / "faiss.index"
-    tbl_path = index_dir / "chunks.csv"
-    cfg_path = index_dir / "config.json"
+    loading_in_progress = True
     
-    if not idx_path.exists() or not tbl_path.exists() or not cfg_path.exists():
-        print(f"[app] Missing index files in {index_dir}")
-        raise FileNotFoundError(f"Missing index files in {index_dir}")
-    
-    print(f"[app] Loading index from {index_dir}...")
-    index = faiss.read_index(str(idx_path))
-    chunks_df = pd.read_csv(tbl_path)
-    config = json.loads(cfg_path.read_text())
-    model = SentenceTransformer(config["model"])
-    print(f"[app] Loaded index with {len(chunks_df):,} chunks")
+    try:
+        print("🚀 Starting index loading...")
+        
+        # Determine index directory path (relative to this file)
+        base_path = Path(__file__).resolve().parent
+        index_dir = base_path / "data" / "processed" / "index"
+        
+        print(f"📁 Looking for data in: {index_dir}")
+        print(f"📁 Absolute path: {index_dir.resolve()}")
+        print(f"📁 Directory exists: {index_dir.exists()}")
+        
+        # Debug: List contents of data directory
+        data_dir = base_path / "data"
+        if data_dir.exists():
+            print(f"📁 Contents of data directory:")
+            for item in data_dir.rglob("*"):
+                rel_path = item.relative_to(base_path)
+                print(f"   - {rel_path} ({'dir' if item.is_dir() else 'file'})")
+        
+        idx_path = index_dir / "faiss.index"
+        tbl_path = index_dir / "chunks.csv"
+        cfg_path = index_dir / "config.json"
+        
+        print(f"📄 faiss.index exists: {idx_path.exists()}")
+        print(f"📄 chunks.csv exists: {tbl_path.exists()}")
+        print(f"📄 config.json exists: {cfg_path.exists()}")
+        
+        if not idx_path.exists() or not tbl_path.exists() or not cfg_path.exists():
+            print(f"❌ Missing index files in {index_dir}")
+            # List what's actually in the index directory
+            if index_dir.exists():
+                print(f"📁 Contents of {index_dir}:")
+                for item in index_dir.iterdir():
+                    print(f"   - {item.name} ({'dir' if item.is_dir() else 'file'})")
+            raise FileNotFoundError(f"Missing index files in {index_dir}")
+        
+        print(f"[app] Loading index from {index_dir}...")
+        index = faiss.read_index(str(idx_path))
+        chunks_df = pd.read_csv(tbl_path)
+        config = json.loads(cfg_path.read_text())
+        model = SentenceTransformer(config["model"])
+        index_loaded = True
+        print(f"✅ Loaded index with {len(chunks_df):,} chunks")
+        print(f"✅ Model: {config['model']}")
+        
+    except Exception as e:
+        print(f"❌ Failed to load index: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
+        index_loaded = False
+    finally:
+        loading_in_progress = False
 
 def retrieve_and_group(query: str, top_courses: int = 8):
     """Retrieve top courses based on query using RAG."""
     
-    if index is None or model is None:
+    if not index_loaded or index is None or model is None:
         return []
     
     # Expand query
@@ -160,34 +203,49 @@ def retrieve_and_group(query: str, top_courses: int = 8):
 @app.route("/")
 def home():
     """Health check endpoint."""
-    return jsonify({"status": "ok", "message": "Schedule Sculptor RAG API is running"})
+    return jsonify({
+        "status": "ok", 
+        "message": "Schedule Sculptor RAG API is running",
+        "index_loaded": index_loaded
+    })
+
+@app.route("/health")
+def health():
+    """Detailed health check."""
+    return jsonify({
+        "status": "ok" if index_loaded else "loading",
+        "index_loaded": index_loaded,
+        "model_loaded": model is not None,
+        "loading_in_progress": loading_in_progress,
+        "timestamp": time.time()
+    })
+
+@app.route("/test")
+def test():
+    """Simple test endpoint."""
+    return jsonify({"status": "ok", "message": "Test endpoint working"})
+
+@app.route("/load-index", methods=["POST"])
+def load_index_endpoint():
+    """Manually trigger index loading."""
+    if loading_in_progress:
+        return jsonify({"status": "loading", "message": "Index loading in progress"})
+    
+    # Load index in a separate thread to avoid blocking
+    thread = threading.Thread(target=load_index)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "started", "message": "Index loading started"})
 
 @app.route("/query", methods=["POST"])
 def query():
     """
     Query endpoint that accepts a question and returns relevant courses.
-    
-    Expected JSON body:
-    {
-        "query": "courses about machine learning",
-        "top_courses": 8  // optional, default 8
-    }
-    
-    Returns:
-    {
-        "query": "...",
-        "results": [
-            {
-                "course_code": "CS 412",
-                "class_name": "Introduction to Machine Learning",
-                "subject": "Computer Science",
-                "description": "...",
-                "score": 0.85
-            },
-            ...
-        ]
-    }
     """
+    if not index_loaded:
+        return jsonify({"error": "Index not loaded. Please wait or trigger loading via /load-index", "index_loaded": False}), 503
+    
     try:
         data = request.get_json()
         
@@ -213,22 +271,28 @@ def query():
         print(f"[app] Error processing query: {e}")
         return jsonify({"error": str(e)}), 500
 
+# Initialize the app when it starts
+def initialize_app():
+    """Load the index when the app starts in a separate thread."""
+    print("🚀 Initializing application...")
+    thread = threading.Thread(target=load_index)
+    thread.daemon = True
+    thread.start()
+
 if __name__ == "__main__":
-    try:
-        load_index()
-    except Exception as e:
-        print(f"[app] Failed to load index: {e}")
-        index = chunks_df = model = config = None
-
-    # Read port from environment so frontend and backend can be started on the same port.
-    # Default to 5001 to avoid common macOS services on 5000.
-    port_env = os.environ.get("RAG_API_PORT") or os.environ.get("PORT") or os.environ.get("RAG_PORT")
-    try:
-        port = int(port_env) if port_env else 5001
-    except ValueError:
-        port = 5001
-
-    host = os.environ.get("RAG_API_HOST", "127.0.0.1")
-    print(f"[app] Starting Flask server on http://{host}:{port}")
+    # Start index loading in background
+    initialize_app()
+    
+    # Get port from environment (Cloud Run sets PORT=8080)
+    port = int(os.environ.get("PORT", 8080))
+    # Use 0.0.0.0 for Cloud Run compatibility
+    host = os.environ.get("HOST", "0.0.0.0")
+    
+    print(f"🚀 Starting Flask server on {host}:{port}")
+    print(f"📊 Index loaded: {index_loaded}")
+    
     # Bind to host and port from environment
-    app.run(debug=True, host=host, port=port)
+    app.run(debug=False, host=host, port=port)
+else:
+    # For Gunicorn deployment
+    initialize_app()

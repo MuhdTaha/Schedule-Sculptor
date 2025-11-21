@@ -2,33 +2,34 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including curl for health checks
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download the model during build
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
 # Copy application code
 COPY . .
 
-# Create data directory structure
-RUN mkdir -p data/processed/index
+# Create startup script
+RUN echo '#!/bin/bash\n\
+echo "Starting Schedule Sculptor API..."\n\
+cd /app\n\
+echo "Starting Gunicorn with main app..."\n\
+exec gunicorn app:app --bind 0.0.0.0:8080 --workers 1 --timeout 120 --access-logfile - --error-logfile - --preload\n\
+' > /start.sh && chmod +x /start.sh
 
-# Copy data files (they'll be in the build context)
-COPY ../data/processed/index/faiss.index data/processed/index/
-COPY ../data/processed/index/chunks.csv data/processed/index/
-COPY ../data/processed/index/config.json data/processed/index/
-
-# Expose port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/test || exit 1
 
-# Start application
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120"]
+CMD ["/start.sh"]

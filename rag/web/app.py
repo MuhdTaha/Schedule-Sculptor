@@ -231,12 +231,8 @@ def load_index_endpoint():
     if loading_in_progress:
         return jsonify({"status": "loading", "message": "Index loading in progress"})
     
-    # Load index in a separate thread to avoid blocking
-    thread = threading.Thread(target=load_index)
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({"status": "started", "message": "Index loading started"})
+    load_index()
+    return jsonify({"status": "done", "index_loaded": index_loaded})
 
 @app.route("/query", methods=["POST"])
 def query():
@@ -275,9 +271,7 @@ def query():
 def initialize_app():
     """Load the index when the app starts in a separate thread."""
     print("🚀 Initializing application...")
-    thread = threading.Thread(target=load_index)
-    thread.daemon = True
-    thread.start()
+    load_index()
 
 if __name__ == "__main__":
     # Start index loading in background
@@ -291,8 +285,8 @@ if __name__ == "__main__":
     print(f"🚀 Starting Flask server on {host}:{port}")
     print(f"📊 Index loaded: {index_loaded}")
     
-    # Bind to host and port from environment
-    app.run(debug=False, host=host, port=port)
+    app.run(host=host, port=port)
 else:
-    # For Gunicorn deployment
-    initialize_app()
+    # If using Gunicorn with preload, load index at startup
+    if os.environ.get("GUNICORN_PRELOAD", "false") == "true":
+        initialize_app()

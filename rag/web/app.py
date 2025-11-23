@@ -95,7 +95,7 @@ def load_index():
         print("🚀 Starting index loading...")
         
         # Determine index directory path (relative to this file)
-        base_path = Path(__file__).resolve().parent
+        base_path = Path(__file__).resolve().parent.parent
         index_dir = base_path / "data" / "processed" / "index"
         
         print(f"📁 Looking for data in: {index_dir}")

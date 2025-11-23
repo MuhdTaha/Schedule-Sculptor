@@ -11,14 +11,8 @@ RUN apt-get update && apt-get install -y \
 COPY web/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the model
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
-
 # Copy all code + data
 COPY . /app
-
-# Copy the index to the location your app expects
-COPY data/processed /app/web/data/processed
 
 # Copy start script
 COPY web/start.sh /start.sh

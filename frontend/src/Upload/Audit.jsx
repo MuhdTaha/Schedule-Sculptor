@@ -5,14 +5,16 @@
 */
 
 import React, { useState, useEffect } from 'react';
-import Layout from './Layout';
-import { parseAuditPDF } from './lib/auditParser'
+import Layout from '../Layout';
+import { parseAuditPDF } from '../lib/auditParser'
+import UploadSuccess from './UploadSuccessModal';
 
 function Audit() {
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [fileName, setFileName] = useState('');
   const [parsedData, setParsedData] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   
   // Load any previously uploaded file info from localStorage on component mount
   useEffect(() => {
@@ -39,13 +41,13 @@ function Audit() {
       setStatus("processing");
       setErrorMessage('');
 
-      // save the name of the file
-      setFileName(file.name);
-      localStorage.setItem("auditFileName", file.name);
-
       // send the file to the audit parser 
       const parsed = await parseAuditPDF(file);
       console.log("✅ Audit parsed successfully:", parsed);
+
+      // save the name of the file
+      setFileName(file.name);
+      localStorage.setItem("auditFileName", file.name);
 
       // save the parsed JSON data to state
       setParsedData(parsed);
@@ -54,6 +56,7 @@ function Audit() {
       localStorage.setItem("parsedAuditData", JSON.stringify(parsed));
 
       setStatus("success");
+      setShowModal(true);
     } catch (error) {
       // handle any errors during parsing
       console.error("❌ Audit parsing failed:", error);
@@ -86,22 +89,33 @@ function Audit() {
 
   const handleReset = () => {
       localStorage.removeItem('auditFileName');
+      localStorage.removeItem('parsedAuditData');
       setStatus('idle');
       setFileName('');
       setErrorMessage('');
+      setShowModal(false);
+      setParsedData(null);
+
+      // refresh the page to reset state
+      window.location.reload();
   }
 
   const renderDropZoneContent = () => {
     switch (status) {
       case 'processing':
-        return <p className="text-lg text-gray-500">Processing...</p>;
+        return <p className="text-lg text-gray-500">Processing Audit...</p>;
       case 'success':
         return (
           <div className="text-center">
             <p className="text-lg font-semibold text-green-600">Upload Successful!</p>
             <p className="text-sm text-gray-500 mt-1 truncate">{fileName}</p>
-            <button onClick={handleReset} className="mt-4 text-sm font-semibold text-red-600 hover:underline z-20 relative">
-              Upload a different file
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReset();
+              }}
+              className="mt-4 text-sm font-semibold text-red-600 hover:underline z-20 relative">
+              Remove & Upload Different File
             </button>
           </div>
         );
@@ -110,7 +124,12 @@ function Audit() {
           <div className="text-center">
             <p className="text-lg font-semibold text-red-600">Error</p>
             <p className="text-sm text-gray-500 mt-1">{errorMessage}</p>
-            <button onClick={handleReset} className="mt-4 text-sm font-semibold text-blue-600 hover:underline z-20 relative">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReset();
+              }}
+              className="mt-4 text-sm font-semibold text-blue-600 hover:underline z-20 relative">
               Try Again
             </button>
           </div>
@@ -132,6 +151,14 @@ function Audit() {
 
   return (
     <Layout>
+      {/* Render the Modal if showModal is true */}
+      {showModal && parsedData && (
+          <UploadSuccess 
+            parsedData={parsedData} 
+            onClose={() => setShowModal(false)} 
+          />
+      )}
+
       <div className="flex justify-center">
         <div className="w-full max-w-xl text-center">
           <h2 className="serif-title text-5xl lg:text-7xl font-bold brand-purple leading-tight mb-4">
@@ -157,6 +184,28 @@ function Audit() {
           />
         </div>
       </div>
+
+      {/* Info button – only shown when audit data exists */}
+      {parsedData && (
+        <div className="flex justify-center mt-4">
+          <button
+            className="flex items-center gap-2 bg-[#4C3B6F] hover:bg-[#392d57] text-white px-4 py-2 rounded-full shadow-md transition-transform transform hover:scale-105"
+            onClick={() => setShowModal(true)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 6h.01M12 3a9 9 0 110 18 9 9 0 010-18z"/>
+            </svg>
+            View Parsed Info
+          </button>
+        </div>
+      )}
     </Layout>
   );
 }

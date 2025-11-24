@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../Layout';
 import { useData } from './DataContext';
-import { generatePlan } from '../lib/planSolver';
+import { generatePlan, generateRationale } from '../lib/planSolver';
 import SculptForm from './SculptForm'; 
 import SculptResults from './SculptResults'; 
 
@@ -14,6 +14,7 @@ export default function SculptSemester() {
   // Redirect to /audit if parsedAudit is missing once data finishes loading
   useEffect(() => {
     if (!isLoading && !parsedAudit) {
+      console.log("No audit data found, redirecting to /audit");
       navigate('/audit');
     }
   }, [isLoading, parsedAudit, navigate]);
@@ -31,6 +32,8 @@ export default function SculptSemester() {
   // State for the generated plan
   const [suggestedPlan, setSuggestedPlan] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [rationale, setRationale] = useState("");
+  const [isRationaleLoading, setIsRationaleLoading] = useState(false);
 
   // Get the list of remaining requirements from the audit data
   const remainingRequirements = useMemo(() => {
@@ -46,11 +49,16 @@ export default function SculptSemester() {
     setSuggestedPlan(null);
 
     // Run the "dumb solver"
-    setTimeout(() => {
+    setTimeout(async () => {
       const result = generatePlan(formPrefs, parsedAudit, courseCatalog);
       setSuggestedPlan(result);
       setIsGenerating(false);
       setView('results'); // Switch to the results view
+
+      setIsRationaleLoading(true);
+      const reasonText = await generateRationale(result, formPrefs, parsedAudit);
+      setRationale(reasonText);
+      setIsRationaleLoading(false);
     }, 1500); // Fake 1.5s delay
   };
 
@@ -58,6 +66,7 @@ export default function SculptSemester() {
   const handleGenerateNewPlan = () => {
     setView('form');
     setSuggestedPlan(null);
+    setRationale("");
   };
 
   if (isLoading) {
@@ -80,6 +89,8 @@ export default function SculptSemester() {
             <SculptResults
               plan={suggestedPlan}
               preferences={preferences}
+              rationale={rationale}
+              isRationaleLoading={isRationaleLoading}
               onGenerateNew={handleGenerateNewPlan}
             />
           )}

@@ -75,7 +75,7 @@ async function callGeminiApi(auditText) {
         "remainingRequirements": [
             {
                 "category": "string",
-                "coursesNeeded": "string or number", // e.g., "Two courses" or 2
+                "coursesNeeded": "number",
                 "courses": [{ "code": "string", "title": "string", "credits": "number" }]
             }
         ]
@@ -97,7 +97,7 @@ async function callGeminiApi(auditText) {
 
     2.  **progress**: 
         - Find the "Total Degree Hours" section.
-        - Extract "required" for 'totalCreditsRequired'.
+        - Extract "_____ hours required" for 'totalCreditsRequired'.
         - Extract "EARNED" for 'creditsCompleted'.
         - Extract "In-Prog" for 'creditsInProgress'.
         - Calculate 'creditsRemaining' (required - completed - inProgress).
@@ -133,13 +133,56 @@ async function callGeminiApi(auditText) {
         - Find all courses marked with "IP" (In Progress).
         - Each course object MUST include 'category', 'semester', 'code', 'title', and 'credits' (as a number).
 
-    6.  **remainingRequirements**: 
-        - Find all requirement sections that are NOT yet met (hoursEarned < hoursRequired or explicitly stated as not complete). 
-        - For each, extract its 'category' (title), 'coursesNeeded' (e.g., "Two courses" or 2), and the list of available 'courses' that can fulfill this requirement (with 'code', 'title', and 'credits').
-        - If a list of acceptable courses is provided (e.g., "Any of the following math and science courses apply..."), include those in the 'courses' array.
+    6.  6. **remainingRequirements**:
+        - Identify all requirement sections that are NOT complete 
+        (hoursEarned < hoursRequired, or marked incomplete).
+
+        - For each requirement, extract:
+            • "category": the exact requirement name
+            • "coursesNeeded": number of courses/hours still required (if shown)
+            • "courses": list of acceptable courses for fulfilling the requirement
+
+        - Requirements may list acceptable courses in **two different formats**:
+        
+        ------------------------------------------------------------
+        (A) Full course data present:
+            Example: "MATH 210 — Calculus III (3 cr)"
+
+            When the audit provides course titles AND/OR credit hours:
+                • Extract all fields normally:
+                    code: "MATH 210"
+                    title: "Calculus III"
+                    credits: 3
+
+        ------------------------------------------------------------
+        (B) Code-only lists:
+            Example: "CS 378,398,407,411,..."
+
+            When NO title or credit information is shown:
+                • You MUST still include each course code
+                • Use:
+                    code: "CS 378"
+                    title: null
+                    credits: null
+                • Do NOT invent title or credit information.
+
+        ------------------------------------------------------------
+        Detection Rule:
+            • If the audit text next to a course contains a title or "(X cr)"
+            → treat it as Format (A)
+            • If the audit text is ONLY codes with commas/spaces
+            → treat it as Format (B)
+
+        - Always split multi-code lists correctly, preserving department prefixes.
+        Example:
+            "CS 378,398,407" → "CS 378", "CS 398", "CS 407"
+        
+        - Do not omit or remove course titles when they exist in the audit.
+        - Do not remove credit hours when they exist in the audit.
 
     7.  Return ONLY the raw JSON object. Do not include "\`\`\`json" or any other text.
 
+    8. You MUST respond with ONLY valid JSON. No comments, no explanation, no backticks.
 
     Here is the degree audit text:
     ---

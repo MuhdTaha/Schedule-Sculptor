@@ -14,12 +14,14 @@
   "homepage": "https://MuhdTaha.github.io/Schedule-Sculptor/",
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.2.3",
     "pdf-parse": "^2.4.5",
     "pdfjs": "^2.5.4",
     "pdfjs-dist": "^2.16.105",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.14.2"
   },
   "devDependencies": {

@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import Layout from './Layout';
+import Layout from '../Layout';
 
 function AIAssistant() {
   const [query, setQuery] = useState('');

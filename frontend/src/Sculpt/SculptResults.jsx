@@ -1,4 +1,49 @@
-import React from 'react';
+import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+
+// --- MODAL COMPONENT ---
+const RationaleModal = ({ isOpen, onClose, rationale, isLoading }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-opacity-50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[#FFF9F0] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative border-4 border-[#E6D5B8]">
+        
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <div className="p-8 max-h-[80vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4C3B6F]"></div>
+              <p className="text-[#4C3B6F] font-medium animate-pulse">Consulting the AI Advisor...</p>
+            </div>
+          ) : (
+            <div className="prose prose-purple prose-lg">
+              {/* Render the Markdown from Gemini */}
+              <ReactMarkdown components={{
+                h1: ({node, ...props}) => <h1 className="serif-title align-middle text-4xl font-bold text-[#4C3B6F] mb-4" {...props} />,
+                strong: ({node, ...props}) => <span className="font-bold text-gray-900" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-2 text-gray-700" {...props} />,
+                li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                p: ({node, ...props}) => <p className="text-gray-600 mb-4 leading-relaxed" {...props} />
+              }}>
+                {rationale}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // A single row for a suggested course
 const SuggestedCourseItem = ({ term, code, credits, title, category }) => {
@@ -36,21 +81,17 @@ const Legend = () => (
   </div>
 );
 
-export default function SculptResults({ plan, preferences, onGenerateNew }) {
+export default function SculptResults({ plan, preferences, onGenerateNew, rationale, isRationaleLoading }) {
+  const [showModal, setShowModal] = useState(false);
+
+  if (!plan) return <div className="text-center"><p className="text-gray-500">Generating...</p></div>;
   
-  if (!plan) {
-    return (
-      <div className="text-center">
-        <p className="text-gray-500">Generating your plan...</p>
-      </div>
-    );
-  }
-  
-  // Simple function to determine a "placeholder" category for the demo
   const getCategory = (course) => {
+    // Check if the planSolver attached a category (from my updated code above)
+    if (course.category) return course.category;
+    
+    // Fallback logic
     if (preferences.requirements.includes("Technical Electives") && course.subject === "CS") return "Tech Elective";
-    if (preferences.requirements.includes("General Education")) return "Gen Ed";
-    if (preferences.requirements.includes("Major Core")) return "Major";
     return "Free Elective";
   }
 
@@ -65,30 +106,40 @@ export default function SculptResults({ plan, preferences, onGenerateNew }) {
         </p>
       </div>
 
-      {/* Course List */}
       <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
         {plan.plan.length > 0 ? (
           plan.plan.map(course => (
             <SuggestedCourseItem
               key={course.code}
-              term="SP26" // Placeholder term
+              term="SP26"
               code={course.code}
               credits={course.credits}
               title={course.title}
-              category={getCategory(course)} // Use placeholder logic
+              category={getCategory(course)}
             />
           ))
         ) : (
-          <p className="text-gray-500 text-center py-4">No courses found matching all your criteria. Try adjusting your preferences.</p>
+          <p className="text-gray-500 text-center py-4">No courses found matching criteria.</p>
         )}
       </div>
 
-      {/* Info Button */}
+      {/* Info Button - Triggers Modal */}
       <div className="text-center mb-6">
-        <button className="bg-white text-[#4C3B6F] font-semibold py-2 px-5 rounded-full border-2 border-[#4C3B6F] hover:bg-gray-50">
-          Why Were These Courses Chosen?
+        <button 
+          onClick={() => setShowModal(true)}
+          className="bg-white text-[#4C3B6F] font-semibold py-2 px-5 rounded-full border-2 border-[#4C3B6F] hover:bg-gray-50 transition-all shadow-sm hover:shadow-md flex items-center mx-auto"
+        >
+          <span className="">✨</span> Why Were These Courses Chosen?
         </button>
       </div>
+
+      {/* Rationale Modal */}
+      <RationaleModal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+        rationale={rationale} 
+        isLoading={isRationaleLoading} 
+      />
 
       {/* Summary and Actions */}
       <div className="flex justify-between items-center mb-4">

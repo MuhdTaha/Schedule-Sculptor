@@ -8,9 +8,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Welcome from './Welcome';
-import Audit from './Audit';
+import Audit from './Upload/Audit';
 import Dashboard from './Dashboard/Dashboard';
-import AIAssistant from './AIAssistant';
+import AIAssistant from './AI-Asisstant/AIAssistant';
 import SculptSemester from './Sculpt/SculptSemester';
 
 function App() {

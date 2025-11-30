@@ -6,7 +6,7 @@
 */
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Welcome from './Welcome';
 import Audit from './Upload/Audit';
 import Dashboard from './Dashboard/Dashboard';
@@ -26,4 +26,3 @@ function App() {
 }
 
 export default App;
-

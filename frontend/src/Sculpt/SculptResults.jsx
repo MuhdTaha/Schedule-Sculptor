@@ -19,7 +19,7 @@ const RationaleModal = ({ isOpen, onClose, rationale, isLoading }) => {
           </svg>
         </button>
 
-        <div className="p-8 max-h-[80vh] overflow-y-auto">
+        <div className="p-8 max-h-[80vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4C3B6F]"></div>

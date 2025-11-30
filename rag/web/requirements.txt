@@ -6,3 +6,5 @@ numpy
 pandas
 sentence_transformers
 gunicorn
+google-generativeai
+pypdf2

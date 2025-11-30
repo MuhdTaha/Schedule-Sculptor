@@ -18,8 +18,22 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 import os
 
+from dotenv import load_dotenv
+
+from PyPDF2 import PdfReader
+import google.generativeai as genai
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
+
+load_dotenv() # Load environment variables from .env file
+
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    print("\nWARNING: GOOGLE_API_KEY not set. Audit parsing will fail.\n")
+else:
+    genai.configure(api_key=GOOGLE_API_KEY)
 
 # Global variables for index and model
 index = None
@@ -70,6 +84,41 @@ TOPIC_SYNONYMS = {
         "cognitive science", "perception", "human factors", "behavioral science"
     ],
 }
+
+def extract_text_from_pdf_stream(file_stream) -> str:
+    """
+    Extracts text from a PDF file stream using pypdf.
+    """
+    try:
+        text = ""
+        reader = PdfReader(file_stream)
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except Exception as e:
+        print(f"Error extracting PDF text: {e}")
+        return ""
+
+def call_gemini(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+    """
+    Calls the Google Gemini API to generate content based on a prompt.
+    """
+    try:
+        # Initialize the model
+        model = genai.GenerativeModel(model_name)
+        
+        # Generate content
+        response = model.generate_content(prompt)
+        
+        # Clean up the response text, removing markdown formatting
+        if response.parts:
+            return response.text.strip().replace("```cypher", "").replace("```json", "").replace("```", "").strip()
+        else:
+            print("Warning: Gemini API returned an empty response.")
+            return ""
+    except Exception as e:
+        print(f"An error occurred with the Gemini API: {e}")
+        return ""
 
 def expand_query(q: str) -> str:
     """Add synonyms/related phrases to the query while keeping the original text."""
@@ -200,6 +249,8 @@ def retrieve_and_group(query: str, top_courses: int = 8):
     
     return results
 
+# --- ROUTES ---
+
 @app.route("/")
 def home():
     """Health check endpoint."""
@@ -265,6 +316,287 @@ def query():
     
     except Exception as e:
         print(f"[app] Error processing query: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/parse-audit", methods=["POST"])
+def parse_audit():
+    """
+    Endpoint to parse a degree audit PDF.
+    Expects a file upload with key 'file'.
+    """
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    try:
+        # 1. Extract text
+        audit_text = extract_text_from_pdf_stream(file.stream)
+        if not audit_text:
+            return jsonify({"error": "Could not extract text from PDF"}), 400
+
+        # 2. Prepare Prompt (Schema Structure)
+        schema_structure = {
+            "studentInfo": {
+                "name": "string",
+                "uin": "string",
+                "degreeProgram": "string",
+                "major": "string",
+                "minor": "string"  # should be "None" if not present
+            },
+
+            "progress": {
+                "totalCreditsRequired": "number",
+                "creditsCompleted": "number",
+                "creditsInProgress": "number",
+                "creditsRemaining": "number"
+            },
+
+            "categories": [
+                {
+                    "name": "string",               # e.g., "University Writing Requirement"
+                    "hoursRequired": "number or null", 
+                    "hoursEarned": "number",
+                    "note": "string or null",
+                    "completed": "boolean",
+                    "courses": [
+                        {
+                            "semester": "string",   # FA22, WS23, etc.
+                            "code": "string",       # ENGL 160, MATH 180
+                            "title": "string",
+                            "credits": "number",
+                            "grade": "string"       # A, B, C, D, F, S, CR, IP
+                        }
+                    ]
+                }
+            ],
+
+            "completedCourses": [
+                {
+                    "category": "string",
+                    "semester": "string",
+                    "code": "string",
+                    "title": "string",
+                    "credits": "number",
+                    "grade": "string"
+                }
+            ],
+
+            "inProgressCourses": [
+                {
+                    "category": "string",
+                    "semester": "string",
+                    "code": "string",
+                    "title": "string",
+                    "credits": "number"
+                }
+            ],
+
+            "remainingRequirements": [
+                {
+                    "category": "string",
+                    "coursesNeeded": "number",
+                    "courses": [
+                        {
+                            "code": "string",
+                            "title": "string",
+                            "credits": "number"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        prompt = f"""
+        You are an expert university registrar's assistant. Your task is to parse a raw text dump
+        from a degree audit PDF and convert it into a structured JSON object.
+
+        Strictly adhere to the following JSON schema structure:
+        {json.dumps(schema_structure, indent=2)}
+
+        RULES:
+        1.  **studentInfo**: 
+            - Extract the Name, UIN, and the full Program string for 'degreeProgram'.
+            - From the 'degreeProgram' string, extract the 'major' (e.g., "Computer Science") and 'minor' (e.g., "Finance"). 
+            - If no minor is listed, set 'minor' to "None".
+
+        2.  **progress**: 
+            - Find the "Total Degree Hours" section.
+            - Extract "_____ hours required" for 'totalCreditsRequired'.
+            - Extract "EARNED" for 'creditsCompleted'.
+            - Extract "In-Prog" for 'creditsInProgress'.
+            - Calculate 'creditsRemaining' (required - completed - inProgress).
+
+        3.  **categories**: 
+        - For EACH requirement section in the degree audit (e.g., "University Writing Requirement", "Math Requirement - CS Major", "Analyzing the Natural World", "Free Electives - CS Major", etc.), create a category object.
+        - Extract the category 'name' exactly as it appears in the audit.
+        - Extract 'hoursRequired' from text like "Six hours required" or "11 hours required".
+        - Extract 'hoursEarned' from text like "EARNED: 6.00 HOURS" or "EARNED: 12.00 HOURS".
+        - Set 'completed' to **true** if the audit explicitly marks the category as complete (e.g., a green checkmark, "Requirement Complete", or "OK") **or** if hoursEarned ≥ hoursRequired.
+        
+        - ⚠️ **Special case — Conditional credit hours:**
+        - If the section uses wording such as **“may be needed to reach 128 Degree Hours”**, do **not** treat the number (e.g., 9) as a fixed 'hoursRequired' value.
+        - Instead, set:
+            "hoursRequired": null
+            "note": "Conditional hours may be required to reach total degree hours."
+        - In this case, mark "completed": true if all other program requirements are satisfied, even if this category alone shows fewer earned hours.
+        
+        - List ALL courses under this category in the 'courses' array, including:
+            - 'semester' (e.g., FA21, WS22, FA22, SP23)
+            - 'code' (e.g., ENGL 160, MATH 180)
+            - 'title' (e.g., Composition I, Calculus I)
+            - 'credits' (as a number)
+            - 'grade' (A, B, C, D, F, S, CR, or IP for in-progress)
+
+        4.  **completedCourses**: 
+            - Find all courses that have a letter grade (A, B, C, D, F) or a status (S, CR). 
+            - Each course object MUST include 'category', 'semester', 'code', 'title', 'credits' (as a number), and 'grade'.
+            - The 'category' should match the requirement section name (e.g., "University Writing Requirement").
+            - Do NOT include courses with grade 'U' or 'IP' or 'W'.
+
+        5.  **inProgressCourses**: 
+            - Find all courses marked with "IP" (In Progress).
+            - Each course object MUST include 'category', 'semester', 'code', 'title', and 'credits' (as a number).
+
+        6.  6. **remainingRequirements**:
+            - Identify all requirement sections that are NOT complete 
+            (hoursEarned < hoursRequired, or marked incomplete).
+
+            - For each requirement, extract:
+                • "category": the exact requirement name
+                • "coursesNeeded": number of courses/hours still required (if shown)
+                • "courses": list of acceptable courses for fulfilling the requirement
+
+            - Requirements may list acceptable courses in **two different formats**:
+            
+            ------------------------------------------------------------
+            (A) Full course data present:
+                Example: "MATH 210 — Calculus III (3 cr)"
+
+                When the audit provides course titles AND/OR credit hours:
+                    • Extract all fields normally:
+                        code: "MATH 210"
+                        title: "Calculus III"
+                        credits: 3
+
+            ------------------------------------------------------------
+            (B) Code-only lists:
+                Example: "CS 378,398,407,411,..."
+
+                When NO title or credit information is shown:
+                    • You MUST still include each course code
+                    • Use:
+                        code: "CS 378"
+                        title: null
+                        credits: null
+                    • Do NOT invent title or credit information.
+
+            ------------------------------------------------------------
+            Detection Rule:
+                • If the audit text next to a course contains a title or "(X cr)"
+                → treat it as Format (A)
+                • If the audit text is ONLY codes with commas/spaces
+                → treat it as Format (B)
+
+            - Always split multi-code lists correctly, preserving department prefixes.
+            Example:
+                "CS 378,398,407" → "CS 378", "CS 398", "CS 407"
+            
+            - Do not omit or remove course titles when they exist in the audit.
+            - Do not remove credit hours when they exist in the audit.
+
+        7.  Return ONLY the raw JSON object. Do not include "\`\`\`json" or any other text.
+
+        8. You MUST respond with ONLY valid JSON. No comments, no explanation, no backticks.
+
+        Degree Audit Text:
+        ---
+        {audit_text}
+        ---
+        """
+
+        # 3. Call Gemini
+        json_string = call_gemini(prompt)
+        
+        if not json_string:
+            return jsonify({"error": "Failed to generate response from AI"}), 500
+
+        # 4. Return the parsed JSON
+        return jsonify(json.loads(json_string))
+
+    except Exception as e:
+        print(f"Error processing audit: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/generate-rationale", methods=["POST"])
+def generate_rationale():
+    """
+    Generate AI rationale for a course plan using Gemini.
+    """
+    if not GOOGLE_API_KEY:
+        return jsonify({"error": "Google API key not configured"}), 500
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        plan_result = data.get("planResult", {})
+        preferences = data.get("preferences", {})
+        parsed_audit = data.get("parsedAudit", {})
+        
+        if not plan_result or not preferences:
+            return jsonify({"error": "Missing required fields: planResult and preferences"}), 400
+        
+        prompt = f"""
+        You are an empathetic and strategic Academic Advisor.
+        
+        CONTEXT:
+        - The student has generated a schedule for the upcoming semester.
+        - Degree Context: {json.dumps(parsed_audit.get('remainingRequirements', 'Unknown'))}.
+        - Preferences: Target Credit Load: {preferences.get('creditLoad', 'Unknown')}, Difficulty: {preferences.get('difficulty', 'Unknown')}.
+        - Requirements Focused On: {', '.join(preferences.get('requirements', []))}.
+        
+        THE PROPOSED SCHEDULE:
+        {chr(10).join([f"- {c['code']} ({c['title']}): {c['credits']} credits. [Fulfills: {c.get('category', 'General')}]" for c in plan_result.get('plan', [])])}
+
+        TASK:
+        Generate a rationale for this schedule using the STRICT MARKDOWN TEMPLATE below. 
+        Do not include any text outside of this structure.
+
+        STRICT OUTPUT STRUCTURE:
+        
+        # Why Were These Courses Chosen?
+        
+        [Paragraph: Write a 1-2 sentence overview based on their degree audit context and progress.]
+        
+        [Unordered List:
+        - **Course Code**: A short explanation of strategic value and how it fits their preferences.
+        - **Course Code**: A short explanation of strategic value and how it fits their preferences.
+        ]
+        
+        [Paragraph: A concluding sentence about the workload balance (e.g., "This mix allows you to focus on...")]
+        
+        TONE: Professional, encouraging, and clear.
+        """
+
+        # Call Gemini
+        rationale = call_gemini(prompt)
+        
+        if not rationale:
+            return jsonify({"error": "Failed to generate rationale"}), 500
+
+        return jsonify({
+            "rationale": rationale,
+            "success": True
+        })
+        
+    except Exception as e:
+        print(f"[app] Error generating rationale: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Initialize the app when it starts

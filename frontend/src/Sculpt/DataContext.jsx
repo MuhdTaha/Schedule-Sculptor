@@ -35,22 +35,39 @@ const DataContext = createContext(null);
  * This provider loads all necessary data on app start:
  * 1. The user's parsed audit from localStorage.
  * 2. The master course catalog (from chunks.csv).
+ * 3. Listens for real-time updates to audit data.
  */
 export function DataProvider({ children }) {
   const [parsedAudit, setParsedAudit] = useState(null);
   const [courseCatalog, setCourseCatalog] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load data from localStorage and set up event listeners
   useEffect(() => {
-    async function loadData() {
+    const loadData = () => {
       try {
         // 1. Load Parsed Audit Data from Local Storage
         const auditDataString = localStorage.getItem('parsedAuditData');
         if (auditDataString) {
           setParsedAudit(JSON.parse(auditDataString));
+        } else {
+          setParsedAudit(null);
         }
 
-        // 2. Load Master Course Catalog from public/chunks.csv
+        // 2. Load Master Course Catalog from public/chunks.csv (only once)
+        if (!courseCatalog) {
+          loadCourseCatalog();
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading data from localStorage:', error);
+        setIsLoading(false);
+      }
+    };
+
+    const loadCourseCatalog = async () => {
+      try {
         const response = await fetch(`${import.meta.env.BASE_URL}chunks.csv`);
         if (!response.ok) {
           throw new Error('Failed to fetch course catalog (chunks.csv)');
@@ -82,21 +99,67 @@ export function DataProvider({ children }) {
         });
         
         setCourseCatalog(cleanedCatalog);
-
       } catch (error) {
-        console.error("Error loading app data:", error);
+        console.error("Error loading course catalog:", error);
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
+    // Initial data load
     loadData();
-  }, []);
+
+    // Listen for storage changes (when audit is uploaded from another tab/component)
+    const handleStorageChange = (e) => {
+      if (e.key === 'parsedAuditData') {
+        console.log('Storage event detected: parsedAuditData updated');
+        if (e.newValue) {
+          try {
+            setParsedAudit(JSON.parse(e.newValue));
+          } catch (error) {
+            console.error('Error parsing updated audit data:', error);
+            setParsedAudit(null);
+          }
+        } else {
+          setParsedAudit(null);
+        }
+      }
+    };
+
+    // Listen for custom event (for same-tab updates)
+    const handleAuditUpdate = (e) => {
+      console.log('Custom auditUpdated event received:', e.detail);
+      if (e.detail?.parsedAudit) {
+        setParsedAudit(e.detail.parsedAudit);
+      } else if (e.detail === null) {
+        // Handle audit removal
+        setParsedAudit(null);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auditUpdated', handleAuditUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auditUpdated', handleAuditUpdate);
+    };
+  }, [courseCatalog]); // Only re-run if courseCatalog changes
 
   const value = {
     parsedAudit,
     courseCatalog,
-    isLoading
+    isLoading,
+    // Optional: expose setter for manual updates if needed
+    setParsedAudit: (auditData) => {
+      setParsedAudit(auditData);
+      // Also update localStorage for consistency
+      if (auditData) {
+        localStorage.setItem('parsedAuditData', JSON.stringify(auditData));
+      } else {
+        localStorage.removeItem('parsedAuditData');
+      }
+    }
   };
 
   return (

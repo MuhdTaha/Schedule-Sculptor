@@ -1,7 +1,7 @@
   import React from 'react';
   import { Link } from 'react-router-dom';
 
-  const UploadSuccess = ({ parsedData, onClose }) => {
+  const UploadSuccessModal = ({ parsedData, onClose }) => {
     if (!parsedData) return null;
 
     const { studentInfo, completedCourses, inProgressCourses} = parsedData;
@@ -11,7 +11,7 @@
 
     return (
       <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-        <div className="bg-white w-full max-w-lg p-8 rounded-3xl shadow-2xl relative mx-4">
+        <div className="bg-white w-full p-8 rounded-3xl shadow-2xl relative mx-4 max-h-[80vh] max-w-[50vw] overflow-y-scroll border-4 border-[#E6D5B8] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onClick={e => e.stopPropagation()}>
           
           {/* Decorative header text */}
           <div className="text-center mb-6">
@@ -96,4 +96,4 @@
     );
   };
 
-  export default UploadSuccess;
+  export default UploadSuccessModal;

@@ -7,7 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../Layout';
 import { parseAuditPDF } from '../lib/auditParser'
-import UploadSuccess from './UploadSuccessModal';
+import UploadSuccessModal from './UploadSuccessModal';
+import UploadStatusModal from './UploadStatusModal';
 
 function Audit() {
   const [status, setStatus] = useState('idle');
@@ -15,6 +16,7 @@ function Audit() {
   const [fileName, setFileName] = useState('');
   const [parsedData, setParsedData] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   
   // Load any previously uploaded file info from localStorage on component mount
   useEffect(() => {
@@ -39,6 +41,7 @@ function Audit() {
 
     try {
       setStatus("processing");
+      setShowStatusModal(true);
       setErrorMessage('');
 
       // send the file to the audit parser 
@@ -55,13 +58,28 @@ function Audit() {
       // save parsed data to localStorage
       localStorage.setItem("parsedAuditData", JSON.stringify(parsed));
 
+      // trigger storage event to update DataContext in other components
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'parsedAuditData',
+        newValue: JSON.stringify(parsed),
+        oldValue: localStorage.getItem('parsedAuditData'),
+        storageArea: localStorage
+      }));
+      
+      // trigger custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('auditUpdated', { 
+        detail: { parsedAudit: parsed } 
+      }));
+
       setStatus("success");
+      setShowStatusModal(false);
       setShowModal(true);
     } catch (error) {
       // handle any errors during parsing
       console.error("❌ Audit parsing failed:", error);
       setErrorMessage("An error occurred while processing the file.");
       setStatus("error");
+      setShowStatusModal(false);
     }
   };
 
@@ -85,19 +103,31 @@ function Audit() {
     if (e.target.files && e.target.files.length > 0) {
       handleFile(e.target.files[0]);
     }
+
+    e.target.value = null; // reset file input
   };
 
   const handleReset = () => {
-      localStorage.removeItem('auditFileName');
-      localStorage.removeItem('parsedAuditData');
-      setStatus('idle');
-      setFileName('');
-      setErrorMessage('');
-      setShowModal(false);
-      setParsedData(null);
+    localStorage.removeItem('auditFileName');
+    localStorage.removeItem('parsedAuditData');
+    setStatus('idle');
+    setFileName('');
+    setErrorMessage('');
+    setShowModal(false);
+    setShowStatusModal(false);
+    setParsedData(null);
 
-      // refresh the page to reset state
-      window.location.reload();
+    // trigger storage event to notify DataContext of removal
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'parsedAuditData',
+      newValue: null,
+      oldValue: localStorage.getItem('parsedAuditData'),
+      storageArea: localStorage
+    }));
+
+    window.dispatchEvent(new CustomEvent('auditUpdated', { 
+      detail: null 
+    }));
   }
 
   const renderDropZoneContent = () => {
@@ -153,11 +183,21 @@ function Audit() {
     <Layout>
       {/* Render the Modal if showModal is true */}
       {showModal && parsedData && (
-          <UploadSuccess 
+          <UploadSuccessModal 
             parsedData={parsedData} 
             onClose={() => setShowModal(false)} 
           />
       )}
+
+      {/* Render the Status Modal when processing */}
+      <UploadStatusModal 
+        status={status}
+        fileName={fileName}
+        onClose={() => {
+          setShowStatusModal(false);
+          setStatus('idle');
+        }}
+      />
 
       <div className="flex justify-center">
         <div className="w-full max-w-xl text-center">

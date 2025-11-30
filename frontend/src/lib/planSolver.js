@@ -1,10 +1,6 @@
 /**
- * planSolver.js: A simple, synchronous plan generator + AI Rationale
+ * planSolver.js: Updated to use backend API for rationale generation
  */
-
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GOOGLE_API_KEY);
 
 export function generatePlan(preferences, parsedAudit, courseCatalog) {
   const { requirements, creditLoad } = preferences;
@@ -80,48 +76,33 @@ function checkPrerequisites(prereqCodes, completedCodes) {
   return prereqCodes.every(code => completedCodes.includes(code));
 }
 
-// --- UPDATED RATIONALE GENERATOR ---
+// --- RATIONALE GENERATOR ---
 export async function generateRationale(planResult, preferences, parsedAudit) {
+  const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8080"; 
   try {
-    // FIX: Changed to 'gemini-1.5-flash' (2.5 does not exist yet)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const response = await fetch(`${API_URL}/generate-rationale`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        planResult,
+        preferences,
+        parsedAudit
+      }),
+    });
 
-    // Construct a focused prompt with EXPLICIT structural instructions
-    const prompt = `
-      You are an empathetic and strategic Academic Advisor.
-      
-      CONTEXT:
-      - The student has generated a schedule for the upcoming semester.
-      - Degree Context: ${JSON.stringify(parsedAudit?.remainingRequirements || "Unknown")}.
-      - Preferences: Target Credit Load: ${preferences.creditLoad}, Difficulty: ${preferences.difficulty}.
-      - Requirements Focused On: ${preferences.requirements.join(", ")}.
-      
-      THE PROPOSED SCHEDULE:
-      ${planResult.plan.map(c => `- ${c.code} (${c.title}): ${c.credits} credits. [Fulfills: ${c.category}]`).join("\n")}
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-      TASK:
-      Generate a rationale for this schedule using the STRICT MARKDOWN TEMPLATE below. 
-      Do not include any text outside of this structure.
-
-      STRICT OUTPUT STRUCTURE:
-      
-      # Why Were These Courses Chosen?
-      
-      [Paragraph: Write a 1-2 sentence overview based on their degree audit context and progress.]
-      
-      [Unordered List:
-      - **Course Code**: A short explanation of strategic value and how it fits their preferences.
-      - **Course Code**: A short explanation of strategic value and how it fits their preferences.
-      ]
-      
-      [Paragraph: A concluding sentence about the workload balance (e.g., "This mix allows you to focus on...")]
-      
-      TONE: Professional, encouraging, and clear.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const data = await response.json();
+    
+    if (data.success) {
+      return data.rationale;
+    } else {
+      throw new Error(data.error || 'Failed to generate rationale');
+    }
     
   } catch (error) {
     console.error("Error generating rationale:", error);

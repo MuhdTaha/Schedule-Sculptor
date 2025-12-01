@@ -3,7 +3,7 @@
  */
 
 export async function parseAuditPDF(file) {
-    const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8080"; 
+    const API_URL = import.meta.env.VITE_API_URL || "https://schedule-sculptor-rag-811303121618.us-central1.run.app"; 
 
     const formData = new FormData();
     formData.append('file', file);

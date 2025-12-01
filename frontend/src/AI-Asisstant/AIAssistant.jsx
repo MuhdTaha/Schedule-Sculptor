@@ -14,8 +14,8 @@ function AIAssistant() {
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
 
-  // API URL - using Render deployment
-  const API_URL = 'https://schedule-sculptor-rag-811303121618.us-central1.run.app//query';
+  // API URL - using GCR deployment
+  const API_URL = 'https://schedule-sculptor-rag-811303121618.us-central1.run.app/query';
 
   const handleSearch = async (e) => {
     e.preventDefault();

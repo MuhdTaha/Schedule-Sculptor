@@ -34,6 +34,10 @@ body {
   color: #4C3B6F;
 }
 
+.brand-purple-bg {
+  background-color: #4C3B6F;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

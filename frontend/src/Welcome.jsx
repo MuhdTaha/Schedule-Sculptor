@@ -62,7 +62,7 @@ function Welcome() {
 
         <button
           onClick={handleButtonClick}
-          className="px-8 py-3 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition-colors text-lg font-medium"
+          className="px-8 py-3 brand-purple-bg text-white rounded-lg hover:bg-[#675790] transition-colors text-lg font-medium"
         >
           {hasUserData ? 'View Progress' : 'Get Started'}
         </button>

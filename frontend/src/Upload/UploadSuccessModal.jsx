@@ -75,6 +75,7 @@
           {/* Left-aligned Re-upload button */}
           <Link
             to="/audit"
+            onClick={onClose}
             className="bg-[#f0e5d7] hover:bg-[#e9dccb] text-[#4C3B6F] rounded-full p-3 py-2 text-sm transition-transform transform hover:scale-110 shadow-lg"
           >
             Re-upload Audit

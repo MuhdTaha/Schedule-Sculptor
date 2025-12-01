@@ -38,61 +38,60 @@ export default function CompletedView({ data }) {
     }
 
     return (
-    <div className="space-y-4">
-        <h3 className="text-xl font-semibold mb-4 text-[#4C3B6F]">Completed</h3>
+        <div className="flex-shrink-0">
+            {/* Fixed Header Section - This stays at the top */}
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-[#4C3B6F]">Completed</h3>
+                <h3 className="font-semibold text-[#4C3B6F] text-lg "> { current.category }</h3>
+            </div>
 
-        {/* Category Header */}
-        <div className="text-center">
-        <h3 className="font-semibold text-[#4C3B6F] mb-4">
-            {current.category}
-        </h3>
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center">
+                <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className={`px-4 py-2 rounded-md ${
+                        page === 0
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-[#4C3B6F] text-white hover:bg-[#392d57]"
+                    }`}
+                >
+                    ◀
+                </button>
+
+                <span className="text-gray-600 font-medium">
+                    {page + 1} / {totalPages}
+                </span>
+
+                <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page === totalPages - 1}
+                    className={`px-4 py-2 rounded-md ${
+                        page === totalPages - 1
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-[#4C3B6F] text-white hover:bg-[#392d57]"
+                    }`}
+                >
+                    ▶
+                </button>
+            </div>
+
+            {/* Scrollable Content Area - This expands downward only */}
+            <div className="flex-grow min-h-0 mt-4">
+                <div className="bg-white rounded-xl shadow p-4 h-full overflow-y-auto">
+                    <CourseListHeader />
+                    {current.courses.map((course, i) => (
+                        <CourseItem
+                            key={i}
+                            term={course.semester || "N/A"}
+                            code={course.code || "N/A"}
+                            credits={parseFloat(course.credits) || 0}
+                            grade={course.grade || "-"}
+                            title={course.title || ""}
+                        />
+                    ))}
+                </div>
+            </div>
         </div>
-
-        {/* Courses List */}
-        <div className="bg-white rounded-xl shadow p-4 max-h-[350px] overflow-y-auto">
-            <CourseListHeader />
-            {current.courses.map((course, i) => (
-                <CourseItem
-                key={i}
-                term={course.semester || "N/A"}
-                code={course.code || "N/A"}
-                credits={parseFloat(course.credits) || 0}
-                grade={course.grade || "-"}
-                title={course.title || ""}
-                />
-            ))}
-        </div>
-
-        {/* Pagination Controls */}
-        <div className="flex justify-between items-center mt-6">
-        <button
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className={`px-4 py-2 rounded-md ${
-            page === 0
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-[#4C3B6F] text-white hover:bg-[#392d57]"
-            }`}
-        >
-            ◀
-        </button>
-
-        <span className="text-gray-600 font-medium">
-            {page + 1} / {totalPages}
-        </span>
-
-        <button
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page === totalPages - 1}
-            className={`px-4 py-2 rounded-md ${
-            page === totalPages - 1
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-[#4C3B6F] text-white hover:bg-[#392d57]"
-            }`}
-        >
-            ▶
-        </button>
-        </div>
-    </div>
     );
 }

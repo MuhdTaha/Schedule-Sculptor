@@ -36,7 +36,7 @@ function Layout({ children }) {
       </div>
 
       {/* Right Column Pillar - placed behind everything */}
-      <div className="absolute top-0 right-0 h-full w-1/4 hidden lg:flex items-stretch justify-end pr-2 xl:pl-10 overflow-hidden z-0">
+      <div className="absolute top-0 right-0 h-full w-1/4 hidden lg:flex items-stretch justify-end pr-2 xl:pr-10 overflow-hidden z-0">
         <img
           src={greekColumn}
           alt="Decorative Greek column"
